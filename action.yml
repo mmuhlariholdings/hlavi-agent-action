@@ -11,11 +11,11 @@ inputs:
   model:
     description: |
       Model to use. The provider is auto-detected from the model name:
-        Anthropic:  claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5
+        Anthropic:  claude-opus-4-0, claude-sonnet-4-0, claude-3-5-sonnet-20241022
         OpenAI:     gpt-4o, gpt-4o-mini, o3, o4-mini
         Google:     gemini-2.0-flash, gemini-1.5-pro
     required: false
-    default: 'claude-opus-4-6'
+    default: 'claude-opus-4-0'
 
   # ── API keys (supply the one that matches your chosen model) ──────────────
   anthropic_api_key:

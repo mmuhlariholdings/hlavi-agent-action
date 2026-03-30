@@ -6,7 +6,7 @@
 #   1. task.model  — set per-task in the Hlavi UI or via `hlavi tasks edit HLA1 --model gpt-4o`
 #   2. board model — set in .hlavi/board.json under config.model
 #   3. inputs.model (this workflow) — selected from the dropdown on manual runs
-#   4. action default — claude-opus-4-6
+#   4. action default — claude-opus-4-0
 
 name: Hlavi Agent
 
@@ -20,12 +20,12 @@ on:
       model:
         description: 'AI model to use (overrides board/task-level config for this run)'
         required: false
-        default: 'claude-opus-4-6'
+        default: 'claude-opus-4-0'
         type: choice
         options:
-          - claude-opus-4-6
-          - claude-sonnet-4-6
-          - claude-haiku-4-5
+          - claude-opus-4-0
+          - claude-sonnet-4-0
+          - claude-3-5-sonnet-20241022
           - gpt-4o
           - gpt-4o-mini
           - o3
@@ -66,7 +66,7 @@ jobs:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
 
           # Pass the model selected in the workflow_dispatch dropdown (falls back to default)
-          model: ${{ inputs.model || 'claude-opus-4-6' }}
+          model: ${{ inputs.model || 'claude-opus-4-0' }}
           dry_run: ${{ inputs.dry_run || 'false' }}
 
           # Optional overrides:
