@@ -58,11 +58,12 @@ jobs:
       - name: Run Hlavi Agent
         uses: mmuhlariholdings/hlavi-agent-action@v1
         with:
-          # Supply the key for your chosen provider.
-          # Only one key is needed — the provider is auto-detected from the model name.
+          # Add secrets for whichever providers you want to use.
+          # The action auto-detects which key to use from the model name.
+          # If the required key is missing the task will be skipped with an explanatory comment.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          # google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
 
           # Pass the model selected in the workflow_dispatch dropdown (falls back to default)
           model: ${{ inputs.model || 'claude-opus-4-6' }}
