@@ -51,7 +51,8 @@ const child_process = __importStar(require("child_process"));
 const prompts_1 = require("../prompts");
 const TOOLS = [
     {
-        name: "bash",
+        type: "custom",
+        name: "run_bash",
         description: "Execute a bash command in the workspace root. Use for builds, tests, git, and any shell operations.",
         input_schema: {
             type: "object",
@@ -62,6 +63,7 @@ const TOOLS = [
         },
     },
     {
+        type: "custom",
         name: "read_file",
         description: "Read the full contents of a file.",
         input_schema: {
@@ -73,6 +75,7 @@ const TOOLS = [
         },
     },
     {
+        type: "custom",
         name: "write_file",
         description: "Write (or overwrite) a file with the given content.",
         input_schema: {
@@ -85,6 +88,7 @@ const TOOLS = [
         },
     },
     {
+        type: "custom",
         name: "list_directory",
         description: "List the immediate contents of a directory.",
         input_schema: {
@@ -95,9 +99,11 @@ const TOOLS = [
                     description: "Directory path relative to workspace root (default: \".\")",
                 },
             },
+            required: [],
         },
     },
     {
+        type: "custom",
         name: "complete_criterion",
         description: "Mark a specific acceptance criterion as completed. Call this after you have implemented and verified the criterion.",
         input_schema: {
@@ -112,6 +118,7 @@ const TOOLS = [
         },
     },
     {
+        type: "custom",
         name: "task_done",
         description: "Signal that all acceptance criteria have been met and the task is complete. Only call this once every criterion is checked off.",
         input_schema: {
@@ -190,7 +197,7 @@ class ClaudeAgentProvider {
     }
     async executeTool(name, input, task, workspaceDir, dryRun) {
         switch (name) {
-            case "bash": {
+            case "run_bash": {
                 const command = input.command;
                 if (dryRun)
                     return `[dry run] would run: ${command}`;

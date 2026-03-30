@@ -15,7 +15,8 @@ import { buildSystemPrompt, buildTaskPrompt } from "../prompts";
 
 const TOOLS: Anthropic.Tool[] = [
   {
-    name: "bash",
+    type: "custom" as const,
+    name: "run_bash",
     description:
       "Execute a bash command in the workspace root. Use for builds, tests, git, and any shell operations.",
     input_schema: {
@@ -27,6 +28,7 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    type: "custom" as const,
     name: "read_file",
     description: "Read the full contents of a file.",
     input_schema: {
@@ -38,6 +40,7 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    type: "custom" as const,
     name: "write_file",
     description: "Write (or overwrite) a file with the given content.",
     input_schema: {
@@ -50,6 +53,7 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    type: "custom" as const,
     name: "list_directory",
     description: "List the immediate contents of a directory.",
     input_schema: {
@@ -60,9 +64,11 @@ const TOOLS: Anthropic.Tool[] = [
           description: "Directory path relative to workspace root (default: \".\")",
         },
       },
+      required: [],
     },
   },
   {
+    type: "custom" as const,
     name: "complete_criterion",
     description:
       "Mark a specific acceptance criterion as completed. Call this after you have implemented and verified the criterion.",
@@ -78,6 +84,7 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    type: "custom" as const,
     name: "task_done",
     description:
       "Signal that all acceptance criteria have been met and the task is complete. Only call this once every criterion is checked off.",
@@ -181,7 +188,7 @@ export class ClaudeAgentProvider implements AgentProvider {
     dryRun: boolean
   ): Promise<string> {
     switch (name) {
-      case "bash": {
+      case "run_bash": {
         const command = input.command as string;
         if (dryRun) return `[dry run] would run: ${command}`;
         core.info(`    $ ${command}`);
