@@ -118,7 +118,7 @@ async function run(): Promise<void> {
 
     const provider = createProvider({ provider: providerName, model: resolvedModel, apiKey });
 
-    task.status = "in_progress";
+    task.status = "inprogress";
     task.agent_assigned = true;
 
     if (!dryRun) {
@@ -163,14 +163,14 @@ async function run(): Promise<void> {
           body:
             `⏸️ **Agent run ended** without completing all criteria ` +
             `(model: \`${resolvedModel}\`, max iterations: ${maxIterations}).\n\n` +
-            `The task has been left in \`in_progress\`. You can re-run the workflow or ` +
+            `The task has been left in \`inprogress\`. You can re-run the workflow or ` +
             `add context via a comment to guide the next run.`,
           created_at: new Date().toISOString(),
           model: resolvedModel,
         },
       ];
       if (!dryRun) store.save(task);
-      core.warning(`  [${task.id}] Not fully completed — left in in_progress for manual follow-up`);
+      core.warning(`  [${task.id}] Not fully completed — left in inprogress for manual follow-up`);
     }
   }
 

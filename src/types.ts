@@ -18,10 +18,11 @@ export interface TaskComment {
 export type TaskStatus =
   | "new"
   | "open"
-  | "in_progress"
+  | "inprogress"
+  | "pending"
   | "review"
   | "done"
-  | "blocked";
+  | "closed";
 
 export interface Task {
   hlavi_spec_version: string;
