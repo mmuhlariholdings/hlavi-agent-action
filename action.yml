@@ -69,6 +69,14 @@ runs:
         if ! command -v claude &> /dev/null; then
           npm install -g @anthropic-ai/claude-code@latest
         fi
+        # Pre-accept TOS and complete onboarding so claude runs unattended in CI
+        mkdir -p ~/.claude
+        cat > ~/.claude/settings.json << 'EOF'
+        {
+          "hasCompletedOnboarding": true,
+          "autoUpdates": false
+        }
+        EOF
 
     - name: Run Hlavi Agent
       shell: bash
@@ -84,3 +92,4 @@ runs:
         INPUT_GIT_USER_NAME: ${{ inputs.git_user_name }}
         INPUT_GIT_USER_EMAIL: ${{ inputs.git_user_email }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
