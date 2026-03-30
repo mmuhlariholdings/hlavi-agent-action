@@ -11,9 +11,9 @@
 name: Hlavi Agent
 
 on:
-  # Run every 30 minutes
+  # Run once a day at 02:00 UTC
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 2 * * *'
   # Allow manual trigger with model override
   workflow_dispatch:
     inputs:

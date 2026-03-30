@@ -51,7 +51,6 @@ const child_process = __importStar(require("child_process"));
 const prompts_1 = require("../prompts");
 const TOOLS = [
     {
-        type: "custom",
         name: "run_bash",
         description: "Execute a bash command in the workspace root. Use for builds, tests, git, and any shell operations.",
         input_schema: {
@@ -63,7 +62,6 @@ const TOOLS = [
         },
     },
     {
-        type: "custom",
         name: "read_file",
         description: "Read the full contents of a file.",
         input_schema: {
@@ -75,7 +73,6 @@ const TOOLS = [
         },
     },
     {
-        type: "custom",
         name: "write_file",
         description: "Write (or overwrite) a file with the given content.",
         input_schema: {
@@ -88,7 +85,6 @@ const TOOLS = [
         },
     },
     {
-        type: "custom",
         name: "list_directory",
         description: "List the immediate contents of a directory.",
         input_schema: {
@@ -99,11 +95,9 @@ const TOOLS = [
                     description: "Directory path relative to workspace root (default: \".\")",
                 },
             },
-            required: [],
         },
     },
     {
-        type: "custom",
         name: "complete_criterion",
         description: "Mark a specific acceptance criterion as completed. Call this after you have implemented and verified the criterion.",
         input_schema: {
@@ -118,7 +112,6 @@ const TOOLS = [
         },
     },
     {
-        type: "custom",
         name: "task_done",
         description: "Signal that all acceptance criteria have been met and the task is complete. Only call this once every criterion is checked off.",
         input_schema: {
@@ -149,13 +142,22 @@ class ClaudeAgentProvider {
         ];
         for (let turn = 0; turn < maxIterations; turn++) {
             numTurns = turn + 1;
-            const response = await this.client.messages.create({
-                model: this.config.model,
-                max_tokens: 8192,
-                system: (0, prompts_1.buildSystemPrompt)(dryRun),
-                tools: TOOLS,
-                messages,
-            });
+            core.info(`  [turn ${numTurns}] calling ${this.config.model} with ${messages.length} messages`);
+            let response;
+            try {
+                response = await this.client.messages.create({
+                    model: this.config.model,
+                    max_tokens: 8192,
+                    system: (0, prompts_1.buildSystemPrompt)(dryRun),
+                    tools: TOOLS,
+                    messages,
+                });
+            }
+            catch (apiErr) {
+                const err = apiErr;
+                core.error(`  API error — status: ${err.status}, error: ${JSON.stringify(err.error)}, message: ${err.message}`);
+                throw apiErr;
+            }
             inputTokens += response.usage.input_tokens;
             outputTokens += response.usage.output_tokens;
             messages.push({ role: "assistant", content: response.content });

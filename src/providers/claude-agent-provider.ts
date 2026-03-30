@@ -13,14 +13,13 @@ import { Task, ProviderConfig } from "../types";
 import { AgentProvider, AgentResult, TaskExecutionParams } from "./index";
 import { buildSystemPrompt, buildTaskPrompt } from "../prompts";
 
-const TOOLS: Anthropic.Tool[] = [
+const TOOLS = [
   {
-    type: "custom" as const,
     name: "run_bash",
     description:
       "Execute a bash command in the workspace root. Use for builds, tests, git, and any shell operations.",
     input_schema: {
-      type: "object" as const,
+      type: "object",
       properties: {
         command: { type: "string", description: "Bash command to run" },
       },
@@ -28,11 +27,10 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    type: "custom" as const,
     name: "read_file",
     description: "Read the full contents of a file.",
     input_schema: {
-      type: "object" as const,
+      type: "object",
       properties: {
         path: { type: "string", description: "Path relative to workspace root" },
       },
@@ -40,11 +38,10 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    type: "custom" as const,
     name: "write_file",
     description: "Write (or overwrite) a file with the given content.",
     input_schema: {
-      type: "object" as const,
+      type: "object",
       properties: {
         path: { type: "string", description: "Path relative to workspace root" },
         content: { type: "string", description: "Full content to write" },
@@ -53,27 +50,24 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    type: "custom" as const,
     name: "list_directory",
     description: "List the immediate contents of a directory.",
     input_schema: {
-      type: "object" as const,
+      type: "object",
       properties: {
         path: {
           type: "string",
           description: "Directory path relative to workspace root (default: \".\")",
         },
       },
-      required: [],
     },
   },
   {
-    type: "custom" as const,
     name: "complete_criterion",
     description:
       "Mark a specific acceptance criterion as completed. Call this after you have implemented and verified the criterion.",
     input_schema: {
-      type: "object" as const,
+      type: "object",
       properties: {
         criterion_id: {
           type: "number",
@@ -84,12 +78,11 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    type: "custom" as const,
     name: "task_done",
     description:
       "Signal that all acceptance criteria have been met and the task is complete. Only call this once every criterion is checked off.",
     input_schema: {
-      type: "object" as const,
+      type: "object",
       properties: {
         summary: {
           type: "string",
@@ -99,7 +92,7 @@ const TOOLS: Anthropic.Tool[] = [
       required: ["summary"],
     },
   },
-];
+] as const;
 
 export class ClaudeAgentProvider implements AgentProvider {
   private readonly client: Anthropic;
@@ -122,14 +115,22 @@ export class ClaudeAgentProvider implements AgentProvider {
 
     for (let turn = 0; turn < maxIterations; turn++) {
       numTurns = turn + 1;
+      core.info(`  [turn ${numTurns}] calling ${this.config.model} with ${messages.length} messages`);
 
-      const response = await this.client.messages.create({
-        model: this.config.model,
-        max_tokens: 8192,
-        system: buildSystemPrompt(dryRun),
-        tools: TOOLS,
-        messages,
-      });
+      let response: Awaited<ReturnType<typeof this.client.messages.create>>;
+      try {
+        response = await this.client.messages.create({
+          model: this.config.model,
+          max_tokens: 8192,
+          system: buildSystemPrompt(dryRun),
+          tools: TOOLS as unknown as Anthropic.Tool[],
+          messages,
+        });
+      } catch (apiErr) {
+        const err = apiErr as { status?: number; error?: unknown; message?: string };
+        core.error(`  API error — status: ${err.status}, error: ${JSON.stringify(err.error)}, message: ${err.message}`);
+        throw apiErr;
+      }
 
       inputTokens += response.usage.input_tokens;
       outputTokens += response.usage.output_tokens;
