@@ -1,0 +1,73 @@
+# Example: add this workflow to any repository that uses Hlavi for task management.
+# The agent will run on a schedule, picking up any task that has autonomous: true
+# and status: "open".
+#
+# Model resolution priority (highest to lowest):
+#   1. task.model  — set per-task in the Hlavi UI or via `hlavi tasks edit HLA1 --model gpt-4o`
+#   2. board model — set in .hlavi/board.json under config.model
+#   3. inputs.model (this workflow) — selected from the dropdown on manual runs
+#   4. action default — claude-opus-4-6
+
+name: Hlavi Agent
+
+on:
+  # Run every 30 minutes
+  schedule:
+    - cron: '*/30 * * * *'
+  # Allow manual trigger with model override
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'AI model to use (overrides board/task-level config for this run)'
+        required: false
+        default: 'claude-opus-4-6'
+        type: choice
+        options:
+          - claude-opus-4-6
+          - claude-sonnet-4-6
+          - claude-haiku-4-5
+          - gpt-4o
+          - gpt-4o-mini
+          - o3
+          - o4-mini
+          - gemini-2.0-flash
+          - gemini-1.5-pro
+      dry_run:
+        description: 'Dry run — log planned actions without writing files or committing'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: write   # needed to commit task status updates and code changes
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Hlavi Agent
+        uses: mmuhlariholdings/hlavi-agent-action@v1
+        with:
+          # Supply the key for your chosen provider.
+          # Only one key is needed — the provider is auto-detected from the model name.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          # google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+
+          # Pass the model selected in the workflow_dispatch dropdown (falls back to default)
+          model: ${{ inputs.model || 'claude-opus-4-6' }}
+          dry_run: ${{ inputs.dry_run || 'false' }}
+
+          # Optional overrides:
+          # hlavi_dir: '.hlavi'
+          # max_iterations: '50'

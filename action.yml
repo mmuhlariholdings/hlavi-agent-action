@@ -1,0 +1,65 @@
+name: 'Hlavi Agent'
+description: 'Autonomously completes Hlavi tasks marked for agent execution using Claude or any supported AI model'
+author: 'M Muhlari Holdings (Pty) Ltd'
+
+branding:
+  icon: 'cpu'
+  color: 'purple'
+
+inputs:
+  # ── Model selection ────────────────────────────────────────────────────────
+  model:
+    description: |
+      Model to use. The provider is auto-detected from the model name:
+        Anthropic:  claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5
+        OpenAI:     gpt-4o, gpt-4o-mini, o3, o4-mini
+        Google:     gemini-2.0-flash, gemini-1.5-pro
+    required: false
+    default: 'claude-opus-4-6'
+
+  # ── API keys (supply the one that matches your chosen model) ──────────────
+  anthropic_api_key:
+    description: 'Anthropic API key — required for Claude models'
+    required: false
+  openai_api_key:
+    description: 'OpenAI API key — required for GPT / o-series models'
+    required: false
+  google_api_key:
+    description: 'Google AI API key — required for Gemini models'
+    required: false
+
+  # ── Hlavi settings ─────────────────────────────────────────────────────────
+  hlavi_dir:
+    description: 'Path to .hlavi directory, relative to the workspace root'
+    required: false
+    default: '.hlavi'
+
+  # ── Agent behaviour ────────────────────────────────────────────────────────
+  max_iterations:
+    description: 'Maximum agentic turns per task before giving up'
+    required: false
+    default: '50'
+  dry_run:
+    description: 'If true, log planned actions without writing files or committing'
+    required: false
+    default: 'false'
+
+  # ── Git ────────────────────────────────────────────────────────────────────
+  git_user_name:
+    description: 'Git author name used for agent commits'
+    required: false
+    default: 'Hlavi Agent'
+  git_user_email:
+    description: 'Git author email used for agent commits'
+    required: false
+    default: 'agent@hlavi.app'
+
+outputs:
+  tasks_processed:
+    description: 'Number of autonomous tasks found and attempted'
+  tasks_completed:
+    description: 'Number of tasks successfully moved to review'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
