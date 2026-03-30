@@ -32,7 +32,7 @@ export interface AgentProvider {
 export function createProvider(config: ProviderConfig): AgentProvider {
   switch (config.provider) {
     case "anthropic":
-      core.info(`  provider: Claude Agent SDK (${config.model})`);
+      core.info(`  provider: Anthropic Messages API (${config.model})`);
       return new ClaudeAgentProvider(config);
 
     case "openai":

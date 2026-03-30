@@ -32,85 +32,219 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClaudeAgentProvider = void 0;
 /**
- * Claude Agent SDK provider.
+ * Claude provider using the Anthropic Messages API directly.
  *
- * Uses @anthropic-ai/claude-agent-sdk (query) so Claude Code's native
- * Bash / Read / Write / Glob / Grep tools are available out of the box.
- * Custom hlavi tools (complete_criterion, task_done) are injected via an
- * in-process MCP server so Claude can check off criteria while it works.
+ * Runs a tool-use loop with built-in shell/file tools plus the custom
+ * hlavi tools (complete_criterion, task_done). No claude CLI required.
  */
+const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const core = __importStar(require("@actions/core"));
-const claude_agent_sdk_1 = require("@anthropic-ai/claude-agent-sdk");
-const zod_1 = require("zod");
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const child_process = __importStar(require("child_process"));
 const prompts_1 = require("../prompts");
+const TOOLS = [
+    {
+        name: "bash",
+        description: "Execute a bash command in the workspace root. Use for builds, tests, git, and any shell operations.",
+        input_schema: {
+            type: "object",
+            properties: {
+                command: { type: "string", description: "Bash command to run" },
+            },
+            required: ["command"],
+        },
+    },
+    {
+        name: "read_file",
+        description: "Read the full contents of a file.",
+        input_schema: {
+            type: "object",
+            properties: {
+                path: { type: "string", description: "Path relative to workspace root" },
+            },
+            required: ["path"],
+        },
+    },
+    {
+        name: "write_file",
+        description: "Write (or overwrite) a file with the given content.",
+        input_schema: {
+            type: "object",
+            properties: {
+                path: { type: "string", description: "Path relative to workspace root" },
+                content: { type: "string", description: "Full content to write" },
+            },
+            required: ["path", "content"],
+        },
+    },
+    {
+        name: "list_directory",
+        description: "List the immediate contents of a directory.",
+        input_schema: {
+            type: "object",
+            properties: {
+                path: {
+                    type: "string",
+                    description: "Directory path relative to workspace root (default: \".\")",
+                },
+            },
+        },
+    },
+    {
+        name: "complete_criterion",
+        description: "Mark a specific acceptance criterion as completed. Call this after you have implemented and verified the criterion.",
+        input_schema: {
+            type: "object",
+            properties: {
+                criterion_id: {
+                    type: "number",
+                    description: "Numeric ID of the criterion to mark done",
+                },
+            },
+            required: ["criterion_id"],
+        },
+    },
+    {
+        name: "task_done",
+        description: "Signal that all acceptance criteria have been met and the task is complete. Only call this once every criterion is checked off.",
+        input_schema: {
+            type: "object",
+            properties: {
+                summary: {
+                    type: "string",
+                    description: "Concise summary of what was implemented",
+                },
+            },
+            required: ["summary"],
+        },
+    },
+];
 class ClaudeAgentProvider {
     constructor(config) {
         this.config = config;
+        this.client = new sdk_1.default({ apiKey: config.apiKey });
     }
     async executeTask(params) {
         const { task, workspaceDir, maxIterations, dryRun } = params;
-        // Completion flag — set by the task_done tool
         let completed = false;
-        // ── Custom MCP tools ──────────────────────────────────────────────────
-        const completeCriterionTool = (0, claude_agent_sdk_1.tool)("complete_criterion", "Mark a specific acceptance criterion as completed. Call this after you have implemented and verified the criterion.", { criterion_id: zod_1.z.number().describe("Numeric ID of the criterion to mark done") }, async ({ criterion_id }) => {
-            const ac = task.acceptance_criteria.find((a) => a.id === criterion_id);
-            if (!ac) {
-                return {
-                    content: [{ type: "text", text: `Criterion ${criterion_id} not found.` }],
-                    isError: true,
-                };
-            }
-            ac.completed = true;
-            ac.completed_at = new Date().toISOString();
-            const msg = `Criterion ${criterion_id} ✓ "${ac.description}"`;
-            core.info(`    ${msg}`);
-            return { content: [{ type: "text", text: msg }] };
-        });
-        const taskDoneTool = (0, claude_agent_sdk_1.tool)("task_done", "Signal that all acceptance criteria have been met and the task is complete. Only call this once every criterion is checked off.", { summary: zod_1.z.string().describe("Concise summary of what was implemented") }, async ({ summary }) => {
-            completed = true;
-            core.info(`    task_done: ${summary}`);
-            return {
-                content: [{ type: "text", text: "Task completion recorded." }],
-            };
-        });
-        const mcpServer = (0, claude_agent_sdk_1.createSdkMcpServer)({
-            name: "hlavi",
-            version: "1.0.0",
-            tools: [completeCriterionTool, taskDoneTool],
-        });
-        // ── Run the agent ─────────────────────────────────────────────────────
-        const agentQuery = (0, claude_agent_sdk_1.query)({
-            prompt: (0, prompts_1.buildTaskPrompt)(task),
-            options: {
-                cwd: workspaceDir,
-                model: this.config.model,
-                maxTurns: maxIterations,
-                systemPrompt: {
-                    type: "preset",
-                    preset: "claude_code",
-                    append: (0, prompts_1.buildSystemPrompt)(dryRun),
-                },
-                // Allow all built-in Claude Code tools; hlavi tools come via MCP
-                permissionMode: "bypassPermissions",
-                // createSdkMcpServer already returns McpSdkServerConfigWithInstance
-                mcpServers: { hlavi: mcpServer },
-            },
-        });
         let numTurns = 0;
-        let costUsd = 0;
-        for await (const message of agentQuery) {
-            if (message.type === "result") {
-                numTurns = message.num_turns;
-                costUsd = message.total_cost_usd;
-                if (message.subtype !== "success") {
-                    core.warning(`  [${task.id}] Agent stopped with subtype "${message.subtype}": ${"errors" in message ? message.errors.join(", ") : ""}`);
-                }
+        let inputTokens = 0;
+        let outputTokens = 0;
+        const messages = [
+            { role: "user", content: (0, prompts_1.buildTaskPrompt)(task) },
+        ];
+        for (let turn = 0; turn < maxIterations; turn++) {
+            numTurns = turn + 1;
+            const response = await this.client.messages.create({
+                model: this.config.model,
+                max_tokens: 8192,
+                system: (0, prompts_1.buildSystemPrompt)(dryRun),
+                tools: TOOLS,
+                messages,
+            });
+            inputTokens += response.usage.input_tokens;
+            outputTokens += response.usage.output_tokens;
+            messages.push({ role: "assistant", content: response.content });
+            if (response.stop_reason === "end_turn" || response.stop_reason !== "tool_use") {
+                break;
             }
+            const toolResults = [];
+            for (const block of response.content) {
+                if (block.type !== "tool_use")
+                    continue;
+                const input = block.input;
+                let resultText;
+                let isError = false;
+                try {
+                    resultText = await this.executeTool(block.name, input, task, workspaceDir, dryRun);
+                }
+                catch (err) {
+                    resultText = `Error: ${err instanceof Error ? err.message : String(err)}`;
+                    isError = true;
+                    core.warning(`  Tool ${block.name} failed: ${resultText}`);
+                }
+                if (block.name === "task_done") {
+                    completed = true;
+                }
+                toolResults.push({
+                    type: "tool_result",
+                    tool_use_id: block.id,
+                    content: resultText,
+                    ...(isError && { is_error: true }),
+                });
+            }
+            messages.push({ role: "user", content: toolResults });
+            if (completed)
+                break;
         }
+        // Rough cost estimate based on Claude Opus 4 pricing
+        const costUsd = (inputTokens * 15 + outputTokens * 75) / 1000000;
         return { completed, numTurns, costUsd };
+    }
+    async executeTool(name, input, task, workspaceDir, dryRun) {
+        switch (name) {
+            case "bash": {
+                const command = input.command;
+                if (dryRun)
+                    return `[dry run] would run: ${command}`;
+                core.info(`    $ ${command}`);
+                const { stdout, stderr } = await execShell(command, workspaceDir);
+                return [stdout, stderr].filter(Boolean).join("\n") || "(no output)";
+            }
+            case "read_file": {
+                const filePath = path.resolve(workspaceDir, input.path);
+                return fs.readFileSync(filePath, "utf-8");
+            }
+            case "write_file": {
+                if (dryRun)
+                    return `[dry run] would write to ${input.path}`;
+                const filePath = path.resolve(workspaceDir, input.path);
+                fs.mkdirSync(path.dirname(filePath), { recursive: true });
+                fs.writeFileSync(filePath, input.content);
+                return `Wrote ${input.content.length} chars to ${input.path}`;
+            }
+            case "list_directory": {
+                const dirPath = path.resolve(workspaceDir, input.path || ".");
+                const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+                return entries.map((e) => (e.isDirectory() ? e.name + "/" : e.name)).join("\n");
+            }
+            case "complete_criterion": {
+                const id = input.criterion_id;
+                const ac = task.acceptance_criteria.find((a) => a.id === id);
+                if (!ac)
+                    return `Criterion ${id} not found.`;
+                ac.completed = true;
+                ac.completed_at = new Date().toISOString();
+                const msg = `Criterion ${id} ✓ "${ac.description}"`;
+                core.info(`    ${msg}`);
+                return msg;
+            }
+            case "task_done": {
+                core.info(`    task_done: ${input.summary}`);
+                return "Task completion recorded.";
+            }
+            default:
+                throw new Error(`Unknown tool: ${name}`);
+        }
     }
 }
 exports.ClaudeAgentProvider = ClaudeAgentProvider;
+function execShell(command, cwd) {
+    return new Promise((resolve, reject) => {
+        child_process.exec(command, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+            if (err) {
+                reject(new Error(`exit ${err.code}: ${stderr || err.message}`));
+            }
+            else {
+                resolve({ stdout, stderr });
+            }
+        });
+    });
+}

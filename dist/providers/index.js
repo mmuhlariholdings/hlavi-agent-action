@@ -48,7 +48,7 @@ const google_provider_1 = require("./google-provider");
 function createProvider(config) {
     switch (config.provider) {
         case "anthropic":
-            core.info(`  provider: Claude Agent SDK (${config.model})`);
+            core.info(`  provider: Anthropic Messages API (${config.model})`);
             return new claude_agent_provider_1.ClaudeAgentProvider(config);
         case "openai":
             core.info(`  provider: OpenAI (${config.model})`);
